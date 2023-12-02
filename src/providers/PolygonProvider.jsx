@@ -1,13 +1,16 @@
-import { ThirdwebSDK } from "@thirdweb-dev/sdk";
+import { ThirdwebProvider, useContract } from "@thirdweb-dev/react";
 
-// If used on the FRONTEND pass your 'clientId'
-const sdk = new ThirdwebSDK("polygon", {
-  clientId: "TW_CLIENT_ID",
-});
-// --- OR ---
-// If used on the BACKEND pass your 'secretKey'
-const sdk = new ThirdwebSDK("polygon", {
-  secretKey: "TW_SECRET_KEY",
-});
+function App() {
+  return (
+    <ThirdwebProvider 
+      activeChain="polygon" 
+      clientId="TW_CLIENT_ID" // You can get a client id from dashboard settings
+    >
+      <Component />
+    </ThirdwebProvider>
+  )
+}
 
-const contract = await sdk.getContract("0x71d8395022098505909A7615EF6207c8fc3E5b12");
+function Component() {
+  const { contract, isLoading } = useContract("0x71d8395022098505909A7615EF6207c8fc3E5b12");
+}

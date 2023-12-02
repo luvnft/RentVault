@@ -154,7 +154,7 @@ export default function Header() {
                         component="div"
                         sx={{ display: { xs: 'none', sm: 'block', fontWeight: "bold" } }}
                     >
-                        🏠 Rent
+                        🏢 Rent
                     </Typography>
                     <Box sx={{ flexGrow: 1 }} />
                     <Box

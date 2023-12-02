@@ -1,153 +1,64 @@
-// SPDX-License-Identifier: CC0-1.0
-pragma solidity ^0.8.21;
-// 0x7893fBa2c1f24E315A6B40F6F675948885B7734C
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@thirdweb-dev/contracts/base/ERC721Base.sol";
 import "./IERC4907.sol";
 
-// PUSH Comm Contract Interface
-interface IPUSHCommInterface {
-    function sendNotification(
-        address _channel,
-        address _recipient,
-        bytes calldata _identity
-    ) external;
-}
-
-contract ERC4907 is ERC721, IERC4907 {
-    uint256 tokenIdCounter;
-    event PropertyListed(
-        uint256 indexed tokenId,
-        address indexed owner,
-        string name,
-        string location,
-        string imageIPFSHash,
-        uint256 price
-    );
-    event PropertyRented(
-        uint256 indexed tokenId,
-        address indexed user,
-        uint256 expires
-    );
-    event BalanceAdded(address user, uint256 price);
+contract ERC4907 is ERC721Base, IERC4907 {
     struct UserInfo {
-        address user;
-        uint64 expires;
+        address user; // address of user role
+        uint64 expires; // unix timestamp, user expires
         string propertyName;
         string location;
         uint256 price;
         string imageIPFSHash;
-        uint256 tokenId;
         address owner;
     }
 
-    mapping(uint256 => UserInfo) public listedProperties;
-    mapping(address => uint256[]) public userProperties;
-    mapping(address => uint256) public totalNoOfProperties;
-    mapping(address => uint256) public balances;
+    mapping(uint256 => UserInfo) internal _users;
 
-    constructor(string memory name_, string memory symbol_)
-        ERC721(name_, symbol_)
-    {
-        tokenIdCounter = 0;
-    }
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        address _royaltyRecipient,
+        uint128 _royaltyBps
+    ) ERC721Base(_name, _symbol, _royaltyRecipient, _royaltyBps) {}
 
-    /// @notice set the user and expires of an NFT
+    // Add your existing custom functionalities here from the old contract
+
+    // ... (Other functions like mint, rentProperty, getUserProperties, etc.)
+
+    /// @notice set the user and expires of a NFT
     /// @dev The zero address indicates there is no user
     /// Throws if `tokenId` is not valid NFT
-    /// @param _user  The new user of the NFT
+    /// @param user  The new user of the NFT
     /// @param expires  UNIX timestamp, The new user could use the NFT before expires
     function setUser(
         uint256 tokenId,
-        address _user,
-        uint64 expires
-    ) public virtual override {
-        UserInfo storage info = listedProperties[tokenId];
-        info.user = _user;
-        info.expires = expires;
-        emit UpdateUser(tokenId, _user, expires);
-    }
-
-    function rentProperty(
-        uint256 tokenId,
-        address _user,
+        address user,
         uint64 expires,
-        uint256 _price
-    ) public {
+        string memory _propertyName,
+        string memory _location,
+        uint256 _price,
+        string memory _imageIPFSHash,
+        address _owner
+    ) public virtual {
         require(
-            _price == listedProperties[tokenId].price,
-            "Please pay the correct price of the Property"
+            isApprovedOrOwner(msg.sender, tokenId),
+            "ERC721: transfer caller is not owner nor approved"
         );
-        require(
-            balances[_user] >= _price,
-            "Please add sufficient balance to your account"
-        );
-        balances[_user] -= _price;
-        setUser(tokenId, _user, expires);
-        balances[ownerOf(tokenId)] += _price;
-        IPUSHCommInterface(0xb3971BCef2D791bc4027BbfedFb47319A4AAaaAa)
-            .sendNotification(
-                0x50b040Ac046e66A91D3B0dB103e025131E29aDE9,
-                msg.sender,
-                bytes(
-                    string(
-                        abi.encodePacked(
-                            "0",
-                            "+",
-                            "3",
-                            "+",
-                            "Property Rent Status",
-                            "+",
-                            abi.encodePacked(
-                                "Property Rented Successfully ",
-                                listedProperties[tokenId].propertyName,
-                                " at ",
-                                listedProperties[tokenId].location,
-                                " for ",
-                                listedProperties[tokenId].price
-                            )
-                        )
-                    )
-                )
-            );
-        emit PropertyRented(tokenId, _user, expires);
+        UserInfo storage info = _users[tokenId];
+        info.user = user;
+        info.expires = expires;
+        info.propertyName = _propertyName;
+        info.location = _location;
+        info.price = _price;
+        info.imageIPFSHash = _imageIPFSHash;
+        info.owner = _owner;
+        emit UpdateUser(tokenId, user, expires);
     }
 
-    /// @notice Get the user address of an NFT
-    /// @dev The zero address indicates that there is no user or the user is expired
-    /// @param tokenId The NFT to get the user address for
-    /// @return The user address for this NFT
-    function userOf(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (address)
-    {
-        if (uint256(listedProperties[tokenId].expires) >= block.timestamp) {
-            return listedProperties[tokenId].user;
-        } else {
-            return ownerOf(tokenId);
-        }
-    }
-
-    /// @notice Get the user expires of an NFT
-    /// @dev The zero value indicates that there is no user
-    /// @param tokenId The NFT to get the user expires for
-    /// @return The user expires for this NFT
-    function userExpires(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (uint256)
-    {
-        if (uint256(listedProperties[tokenId].expires) >= block.timestamp) {
-            return listedProperties[tokenId].expires;
-        } else {
-            return
-                115792089237316195423570985008687907853269984665640564039457584007913129639935;
-        }
-    }
+    // Additional custom functionalities and mappings from the old contract can be integrated similarly.
 
     /// @dev See {IERC165-supportsInterface}.
     function supportsInterface(bytes4 interfaceId)
@@ -162,162 +73,5 @@ contract ERC4907 is ERC721, IERC4907 {
             super.supportsInterface(interfaceId);
     }
 
-    // function _beforeTokenTransfer(
-    //     address from,
-    //     address to,
-    //     uint256 tokenId,
-    //     uint256 /** batch **/
-    // ) internal virtual override {
-    //     if (from != to && listedProperties[tokenId].user != address(0)) {
-    //         delete listedProperties[tokenId];
-    //         emit UpdateUser(tokenId, address(0), 0);
-    //     }
-    // }
-
-    function allAvailableRentingProperties()
-        public
-        view
-        returns (UserInfo[] memory)
-    {
-        uint256 tokenId = tokenIdCounter;
-        uint256 propertyCount = 0;
-        for (uint256 i = 0; i < tokenId; i++) {
-            if (listedProperties[i].expires < block.timestamp) {
-                propertyCount++;
-            }
-        }
-        UserInfo[] memory properties = new UserInfo[](propertyCount);
-        uint256 j = 0;
-        for (uint256 i = 0; i < tokenId; i++) {
-            if (listedProperties[i].expires < block.timestamp) {
-                properties[j] = listedProperties[i];
-                j++;
-            }
-        }
-        return properties;
-    }
-
-    function getUserProperties() public view returns (UserInfo[] memory) {
-        UserInfo[] memory properties = new UserInfo[](
-            totalNoOfProperties[msg.sender]
-        );
-        for (uint256 i = 0; i < totalNoOfProperties[msg.sender]; i++) {
-            properties[i] = listedProperties[userProperties[msg.sender][i]];
-        }
-        return properties;
-    }
-
-    function getRentedProperties(address _accountAddr) public view returns (UserInfo[] memory) {
-        uint256 tokenId = tokenIdCounter;
-        uint256 propertyCount = 0;
-        for (uint256 i = 0; i < tokenId; i++) {
-            if (listedProperties[i].expires >= block.timestamp) {
-                if (_accountAddr == userOf(i)) {
-                    propertyCount++;
-                }
-            }
-        }
-        UserInfo[] memory properties = new UserInfo[](propertyCount);
-        uint256 j = 0;
-        for (uint256 i = 0; i < tokenId; i++) {
-            if (listedProperties[i].expires >= block.timestamp) {
-                if (_accountAddr == userOf(i)) {
-                    properties[j] = listedProperties[i];
-                    j++;
-                }
-            }
-        }
-        return properties;
-    }
-
-    function mint(
-        string memory _propertyName,
-        string memory _location,
-        uint256 _price,
-        string memory _imageIPFSHash
-    ) public {
-        uint256 tokenId = tokenIdCounter;
-        tokenIdCounter++;
-        listedProperties[tokenId] = UserInfo({
-            user: address(0),
-            expires: 0,
-            propertyName: _propertyName,
-            location: _location,
-            price: _price,
-            imageIPFSHash: _imageIPFSHash,
-            tokenId: tokenId,
-            owner: msg.sender
-        });
-        userProperties[msg.sender].push(tokenId);
-        totalNoOfProperties[msg.sender]++;
-        _mint(msg.sender, tokenId);
-        IPUSHCommInterface(0xb3971BCef2D791bc4027BbfedFb47319A4AAaaAa)
-            .sendNotification(
-                0x50b040Ac046e66A91D3B0dB103e025131E29aDE9,
-                msg.sender,
-                bytes(
-                    string(
-                        abi.encodePacked(
-                            "0",
-                            "+",
-                            "3",
-                            "+",
-                            "Property Registration Status",
-                            "+",
-                            abi.encodePacked(
-                                "Property Registered Successfully ",
-                                _propertyName,
-                                " at ",
-                                _location,
-                                " for ",
-                                _price
-                            )
-                        )
-                    )
-                )
-            );
-        emit PropertyListed(
-            tokenId,
-            msg.sender,
-            _propertyName,
-            _location,
-            _imageIPFSHash,
-            _price
-        );
-    }
-
-    function getUserBalance() public view returns (uint256) {
-        return balances[msg.sender];
-    }
-
-    function addUserBalance(uint256 _amount) public {
-        balances[msg.sender] += _amount;
-        IPUSHCommInterface(0xb3971BCef2D791bc4027BbfedFb47319A4AAaaAa)
-            .sendNotification(
-                0x50b040Ac046e66A91D3B0dB103e025131E29aDE9,
-                msg.sender,
-                bytes(
-                    string(
-                        abi.encodePacked(
-                            "0",
-                            "+",
-                            "3",
-                            "+",
-                            "Balance Status",
-                            "+",
-                            abi.encodePacked(
-                                "Your balance of ",
-                                _amount,
-                                " has been successfully added!"
-                            )
-                        )
-                    )
-                )
-            );
-        emit BalanceAdded(msg.sender, _amount);
-    }
-
-    function time() public view returns (uint256) {
-        return block.timestamp;
-    }
+    // Add other custom functions and mappings from your old contract here.
 }
